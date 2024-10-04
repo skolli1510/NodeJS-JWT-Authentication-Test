@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.7/axios.min.js" integrity="sha512-NQfB/bDaB8kaSXF8E77JjhHG5PM6XVRxvHzkZiwl3ddWCEPBa23T76MuWSwAJdMGJnmQqM0VeY9kFszsrBEFrQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+    <div class="container-fluid">
+        <h1 class="row">
+            Login
+        </h1>
+        <main>
+            <div class="row">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username">
+            </div>
+            <div class="row">
+                <label for="password">password</label>
+                <input type="password" name="password" id="password">
+            </div>
+            <div>
+                <button onclick="login()">Login</button>
+                <button onclick="getDashboard()">Get Dashboard</button>
+                <button onclick="getSettings()">Settings</button>
+            </div>
+        </main>
+    </div>
+
+   <script>
+       
+        function login(){
+            const data ={
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+            };
+
+            axios.post('/api/login',data)
+            .then(res => {
+                console.log(res);
+                document.getElementById('username').value= '';
+                document.getElementById('password').value = '';
+                if(res && res.data && res.data.success){
+                    const token = res.data.token;
+                    localStorage.setItem('jwt',token);
+                    getDashboard();
+                }
+            });
+        }    
+
+        function getDashboard(){
+            if(validToken()){
+                localStorage.removeItem('jwt');
+                window.location.href = '/';
+                return;
+            }else{
+                const token = localStorage.getItem('jwt');
+                console.log('Token:',token);
+                axios.get('/api/dashboard', {
+                    headers : {
+                        'Authorization' :`Bearer ${token}`
+                    }
+                }).then(res =>{
+                    document.querySelector('h1.row').innerHTML = 'Dashboard';
+                    document.querySelector('main').innerHTML=res.data.myContent;
+                    const myDiv = document.createElement('div');
+                    const myButton = document.createElement('button');
+                    myButton.setAttribute("id","myButton");
+                    myButton.innerHTML = 'Settings';
+                    myButton.addEventListener("click",getSettings);
+                    myDiv.appendChild(myButton);
+                    document.querySelector('main').appendChild(myDiv);
+                    var data = document.querySelector("body").innerHTML;
+                    history.pushState(data, null, 'http://localhost:3000/api/dashboard');
+                }).catch(err =>{
+                    if( err  && err.data && err.data.err){
+                        const errorRes= err.data.err;
+                        console.log(errorRes.code);
+                        if(errorRes.inner != undefined && errorRes.inner.name === 'TokenExpiredError'){
+                            console.log('Redirect to homepage');
+                        }
+                    }
+                });
+            }
+        }
+
+        function getSettings() {
+            if(validToken()){
+                localStorage.removeItem('jwt');
+                window.location.href = '/';
+                return;
+            }else{
+                const token = localStorage.getItem('jwt');
+                console.log('Token:',token);
+                axios.get('/api/settings', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }).then(res => {
+                    if (res && res.data && res.data.success) {
+                        document.querySelector('h1.row').innerHTML = 'Settings';
+                        document.querySelector('main').innerHTML = res.data.myContent;
+                        var content= document.querySelector('body').innerHTML;
+                        history.pushState(content, null, 'http://localhost:3000/api/settings');
+                    }
+                }).catch(err =>{
+                    if( err  && err.data && err.data.err){
+                        const errorRes= err.data.err;
+                        console.log(errorRes.code);
+                        if(errorRes.inner != undefined && errorRes.inner.name === 'TokenExpiredError'){
+                            console.log('Redirect to homepage');
+                        }
+                    }
+                });
+            }
+        }
+
+        function validToken() {
+    const token = localStorage.getItem('jwt');
+    if (token != null) {
+        const expiry = (JSON.parse(atob(token.split('.')[1]))).exp;
+        if (expiry * 1000 < Date.now()) {
+            // Token is expired, redirect to homepage
+            console.log('JWT expired, redirecting to homepage');
+            localStorage.removeItem('jwt');
+            window.location.href = '/'; // Reload the page on the root address
+            return true;
+        }
+    }
+    return false;
+}      
+
+        window.addEventListener('popstate', function(e) {
+            var character = e.state;
+            if(character==null)
+                window.location.href = '/';
+            else{
+                document.querySelector('body').innerHTML = character;
+            }
+        });
+
+     </script> 
+</body>
+</html>
